@@ -267,3 +267,68 @@ impl<K: Key, V> IndexMut<K> for Arena<K, V> {
 		self.get_mut(key).expect("invalid key")
 	}
 }
+
+#[cfg(test)]
+mod test {
+	use crate::key::{Id, Key};
+
+	use super::Arena;
+
+	#[test]
+	fn add_and_remove() {
+		let mut arena = Arena::<Id, u32>::new();
+
+		let a = arena.insert(10);
+		let b = arena.insert(20);
+		let c = arena.insert(30);
+
+		assert_eq!(arena[a], 10);
+		assert_eq!(arena[b], 20);
+		assert_eq!(arena[c], 30);
+
+		assert_eq!(arena.len(), 3);
+
+		arena.remove(a);
+
+		assert_eq!(arena.len(), 2);
+
+		arena.remove(b);
+
+		assert_eq!(arena.len(), 1);
+
+		arena.remove(c);
+
+		assert_eq!(arena.len(), 0);
+	}
+
+	#[test]
+	fn remove_twice() {
+		let mut arena = Arena::<Id, usize>::new();
+
+		let a = arena.insert(10);
+
+		assert_eq!(arena.try_remove(a), Some(10));
+		assert_eq!(arena.try_remove(a), None);
+	}
+
+	#[test]
+	fn iterate_all() {
+		const COUNT: usize = 100;
+
+		let mut arena = Arena::<Id, usize>::with_capacity(COUNT);
+
+		for i in 0..COUNT {
+			let _id = arena.insert(COUNT - i);
+		}
+
+		let mut count = 0;
+
+		for (id, value) in arena.iter() {
+			assert_eq!(*value, COUNT - id.index());
+
+			count += 1;
+		}
+
+		assert_eq!(count, COUNT);
+	}
+}
