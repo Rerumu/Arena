@@ -69,6 +69,40 @@ macro_rules! impl_iterator {
 impl_iterator!(Iter, &'a Entry<V, K::Version>, &'a V, as_ref);
 impl_iterator!(IterMut, &'a mut Entry<V, K::Version>, &'a mut V, as_mut);
 
+pub struct Keys<'a, K: Key, V> {
+	iter: Iter<'a, K, V>,
+}
+
+impl<'a, K: Key, V> Iterator for Keys<'a, K, V> {
+	type Item = K;
+
+	#[inline]
+	fn next(&mut self) -> Option<Self::Item> {
+		self.iter.next().map(|entry| entry.0)
+	}
+
+	#[inline]
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		self.iter.size_hint()
+	}
+
+	#[inline]
+	fn count(self) -> usize {
+		self.iter.count()
+	}
+}
+
+impl<'a, K: Key, V> DoubleEndedIterator for Keys<'a, K, V> {
+	#[inline]
+	fn next_back(&mut self) -> Option<Self::Item> {
+		self.iter.next_back().map(|entry| entry.0)
+	}
+}
+
+impl<K: Key, V> ExactSizeIterator for Keys<'_, K, V> {}
+
+impl<K: Key, V> FusedIterator for Keys<'_, K, V> {}
+
 impl<K: Key, V> Arena<K, V> {
 	/// Returns an iterator over the arena keys and values.
 	#[must_use]
@@ -86,6 +120,12 @@ impl<K: Key, V> Arena<K, V> {
 		let buf = self.buf.iter_mut().enumerate();
 
 		IterMut { buf, len }
+	}
+
+	/// Returns an iterator over the arena keys.
+	#[must_use]
+	pub fn keys(&self) -> Keys<'_, K, V> {
+		Keys { iter: self.iter() }
 	}
 }
 
