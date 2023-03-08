@@ -105,6 +105,19 @@ impl<K: Key, V> Arena<K, V> {
 		self.next = 0;
 	}
 
+	/// Reserves capacity for at least `additional` more elements to be
+	/// inserted in the given [`Arena`]. The collection may reserve more
+	/// space to speculatively avoid frequent reallocations.
+	pub fn reserve(&mut self, additional: usize) {
+		self.buf.reserve(additional);
+	}
+
+	/// Reserves the minimum capacity for exactly `additional` more elements to be
+	/// inserted in the given [`Arena`].
+	pub fn reserve_exact(&mut self, additional: usize) {
+		self.buf.reserve_exact(additional);
+	}
+
 	/// Returns the number of elements in the [`Arena`].
 	#[inline]
 	#[must_use]
