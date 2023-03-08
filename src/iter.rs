@@ -1,6 +1,9 @@
 use std::iter::{Enumerate, FusedIterator};
 
-use crate::{collection::Entry, key::Key};
+use crate::{
+	collection::{Arena, Entry},
+	key::Key,
+};
 
 macro_rules! impl_iterator {
 	($name:ident, $entry:ty, $value:ty, $ref:ident) => {
@@ -62,3 +65,68 @@ macro_rules! impl_iterator {
 
 impl_iterator!(Iter, &'a Entry<V, K::Version>, &'a V, as_ref);
 impl_iterator!(IterMut, &'a mut Entry<V, K::Version>, &'a mut V, as_mut);
+
+impl<K: Key, V> Arena<K, V> {
+	#[must_use]
+	pub fn iter(&self) -> Iter<'_, K, V> {
+		let len = self.len();
+		let buf = self.buf.iter().enumerate();
+
+		Iter { buf, len }
+	}
+
+	#[must_use]
+	pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+		let len = self.len();
+		let buf = self.buf.iter_mut().enumerate();
+
+		IterMut { buf, len }
+	}
+}
+
+impl<'a, K: Key, V> IntoIterator for &'a Arena<K, V> {
+	type Item = (K, &'a V);
+	type IntoIter = Iter<'a, K, V>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter()
+	}
+}
+
+impl<'a, K: Key, V> IntoIterator for &'a mut Arena<K, V> {
+	type Item = (K, &'a mut V);
+	type IntoIter = IterMut<'a, K, V>;
+
+	fn into_iter(self) -> Self::IntoIter {
+		self.iter_mut()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::{
+		collection::Arena,
+		key::{Id, Key},
+	};
+
+	#[test]
+	fn iterate_all() {
+		const COUNT: usize = 100;
+
+		let mut arena = Arena::<Id, usize>::with_capacity(COUNT);
+
+		for i in 0..COUNT {
+			let _id = arena.insert(COUNT - i);
+		}
+
+		let mut count = 0;
+
+		for (id, value) in &arena {
+			assert_eq!(*value, COUNT - id.index());
+
+			count += 1;
+		}
+
+		assert_eq!(count, COUNT);
+	}
+}

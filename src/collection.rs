@@ -1,10 +1,6 @@
 use std::ops::{Index, IndexMut};
 
-use crate::{
-	iter::{Iter, IterMut},
-	key::Key,
-	version::Version,
-};
+use crate::{key::Key, version::Version};
 
 pub(crate) enum Value<T> {
 	Occupied { value: T },
@@ -69,9 +65,9 @@ fn has_version<K: Key, T>(key: K, entry: &Entry<T, K::Version>) -> bool {
 }
 
 pub struct Arena<K: Key, V> {
-	buf: Vec<Entry<V, K::Version>>,
-	len: usize,
-	next: usize,
+	pub(crate) buf: Vec<Entry<V, K::Version>>,
+	pub(crate) len: usize,
+	pub(crate) next: usize,
 }
 
 impl<K: Key, V> Arena<K, V> {
@@ -186,22 +182,6 @@ impl<K: Key, V> Arena<K, V> {
 		self.try_remove(key).expect("invalid key")
 	}
 
-	#[must_use]
-	pub fn iter(&self) -> Iter<'_, K, V> {
-		let len = self.len();
-		let buf = self.buf.iter().enumerate();
-
-		Iter { buf, len }
-	}
-
-	#[must_use]
-	pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
-		let len = self.len();
-		let buf = self.buf.iter_mut().enumerate();
-
-		IterMut { buf, len }
-	}
-
 	pub fn retain(&mut self, mut f: impl FnMut(K, &V) -> bool) {
 		let mut remaining = self.len();
 
@@ -270,7 +250,7 @@ impl<K: Key, V> IndexMut<K> for Arena<K, V> {
 
 #[cfg(test)]
 mod test {
-	use crate::key::{Id, Key};
+	use crate::key::Id;
 
 	use super::Arena;
 
@@ -309,26 +289,5 @@ mod test {
 
 		assert_eq!(arena.try_remove(a), Some(10));
 		assert_eq!(arena.try_remove(a), None);
-	}
-
-	#[test]
-	fn iterate_all() {
-		const COUNT: usize = 100;
-
-		let mut arena = Arena::<Id, usize>::with_capacity(COUNT);
-
-		for i in 0..COUNT {
-			let _id = arena.insert(COUNT - i);
-		}
-
-		let mut count = 0;
-
-		for (id, value) in arena.iter() {
-			assert_eq!(*value, COUNT - id.index());
-
-			count += 1;
-		}
-
-		assert_eq!(count, COUNT);
 	}
 }
