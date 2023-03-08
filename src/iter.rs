@@ -1,3 +1,5 @@
+//! Contains the arena iterator types.
+
 use std::iter::{Enumerate, FusedIterator};
 
 use crate::{
@@ -7,6 +9,7 @@ use crate::{
 
 macro_rules! impl_iterator {
 	($name:ident, $entry:ty, $value:ty, $ref:ident) => {
+		/// An iterator over the keys and values of the arena.
 		pub struct $name<'a, K: Key, V> {
 			pub(crate) buf: Enumerate<std::slice::$name<'a, Entry<V, K::Version>>>,
 			pub(crate) len: usize,
@@ -67,6 +70,7 @@ impl_iterator!(Iter, &'a Entry<V, K::Version>, &'a V, as_ref);
 impl_iterator!(IterMut, &'a mut Entry<V, K::Version>, &'a mut V, as_mut);
 
 impl<K: Key, V> Arena<K, V> {
+	/// Returns an iterator over the arena keys and values.
 	#[must_use]
 	pub fn iter(&self) -> Iter<'_, K, V> {
 		let len = self.len();
@@ -75,6 +79,7 @@ impl<K: Key, V> Arena<K, V> {
 		Iter { buf, len }
 	}
 
+	/// Returns a mutable iterator over the arena keys and values.
 	#[must_use]
 	pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
 		let len = self.len();

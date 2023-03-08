@@ -1,3 +1,5 @@
+//! Contains the [`Arena`] type, which is the main type of this crate.
+
 use std::ops::{Index, IndexMut};
 
 use crate::{key::Key, version::Version};
@@ -64,6 +66,8 @@ fn has_version<K: Key, T>(key: K, entry: &Entry<T, K::Version>) -> bool {
 	key.version() == entry.version
 }
 
+/// An [`Arena`] is a collection of values that can be accessed by a [`Key`].
+/// It is similar to a [`Vec`], but it has stable and reusable indices.
 pub struct Arena<K: Key, V> {
 	pub(crate) buf: Vec<Entry<V, K::Version>>,
 	pub(crate) len: usize,
@@ -71,6 +75,7 @@ pub struct Arena<K: Key, V> {
 }
 
 impl<K: Key, V> Arena<K, V> {
+	/// Creates a new, empty [`Arena`].
 	#[inline]
 	#[must_use]
 	pub const fn new() -> Self {
@@ -81,6 +86,7 @@ impl<K: Key, V> Arena<K, V> {
 		}
 	}
 
+	/// Creates a new, empty [`Arena`] with the specified capacity.
 	#[inline]
 	#[must_use]
 	pub fn with_capacity(capacity: usize) -> Self {
@@ -91,6 +97,7 @@ impl<K: Key, V> Arena<K, V> {
 		}
 	}
 
+	/// Clears the [`Arena`], removing all values.
 	#[inline]
 	pub fn clear(&mut self) {
 		self.buf.clear();
@@ -98,18 +105,21 @@ impl<K: Key, V> Arena<K, V> {
 		self.next = 0;
 	}
 
+	/// Returns the number of elements in the [`Arena`].
 	#[inline]
 	#[must_use]
 	pub const fn len(&self) -> usize {
 		self.len
 	}
 
+	/// Returns `true` if the [`Arena`] contains no elements.
 	#[inline]
 	#[must_use]
 	pub const fn is_empty(&self) -> bool {
 		self.len() == 0
 	}
 
+	/// Returns a reference to the value corresponding to the key.
 	#[inline]
 	#[must_use]
 	pub fn get(&self, key: K) -> Option<&V> {
@@ -120,6 +130,7 @@ impl<K: Key, V> Arena<K, V> {
 			.and_then(|element| element.value.as_ref())
 	}
 
+	/// Returns a mutable reference to the value corresponding to the key.
 	#[inline]
 	#[must_use]
 	pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
@@ -140,6 +151,7 @@ impl<K: Key, V> Arena<K, V> {
 		)
 	}
 
+	/// Attempts to insert a value into the [`Arena`], returning the key if successful.
 	#[inline]
 	#[must_use]
 	pub fn try_insert(&mut self, value: V) -> Option<K> {
@@ -157,12 +169,14 @@ impl<K: Key, V> Arena<K, V> {
 		Some(key)
 	}
 
+	/// Inserts a value into the [`Arena`], returning the key.
 	#[inline]
 	#[must_use]
 	pub fn insert(&mut self, value: V) -> K {
 		self.try_insert(value).expect("arena is full")
 	}
 
+	/// Attempts to remove a value from the [`Arena`], returning the value if successful.
 	#[inline]
 	pub fn try_remove(&mut self, key: K) -> Option<V> {
 		let old = self
@@ -177,11 +191,13 @@ impl<K: Key, V> Arena<K, V> {
 		Some(old)
 	}
 
+	/// Removes a value from the [`Arena`], returning the value.
 	#[inline]
 	pub fn remove(&mut self, key: K) -> V {
 		self.try_remove(key).expect("invalid key")
 	}
 
+	/// Retains only the elements specified by the predicate.
 	pub fn retain(&mut self, mut f: impl FnMut(K, &V) -> bool) {
 		let mut remaining = self.len();
 
@@ -203,6 +219,7 @@ impl<K: Key, V> Arena<K, V> {
 		}
 	}
 
+	/// Retains only the elements specified by the predicate, passing a mutable reference to it.
 	pub fn retain_mut(&mut self, mut f: impl FnMut(K, &mut V) -> bool) {
 		let mut remaining = self.len();
 
