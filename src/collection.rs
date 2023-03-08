@@ -157,11 +157,9 @@ impl<K: Key, V> Arena<K, V> {
 	#[inline]
 	fn key_at_next(&self) -> Option<K> {
 		let entry = self.buf.get(self.next);
+		let version = entry.map_or_else(K::Version::new, |entry| entry.version);
 
-		entry.map(|entry| entry.version).map_or_else(
-			|| K::new(self.next, K::Version::new()),
-			|version| K::new(self.next, version),
-		)
+		K::new(self.next, version)
 	}
 
 	/// Attempts to insert a value into the [`Arena`], returning the key if successful.
