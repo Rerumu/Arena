@@ -117,12 +117,16 @@ impl<K: Key, V> Arena<K, V> {
 	/// inserted in the given [`Arena`]. The collection may reserve more
 	/// space to speculatively avoid frequent reallocations.
 	pub fn reserve(&mut self, additional: usize) {
+		let additional = additional.saturating_sub(self.capacity() - self.len());
+
 		self.buf.reserve(additional);
 	}
 
 	/// Reserves the minimum capacity for exactly `additional` more elements to be
 	/// inserted in the given [`Arena`].
 	pub fn reserve_exact(&mut self, additional: usize) {
+		let additional = additional.saturating_sub(self.capacity() - self.len());
+
 		self.buf.reserve_exact(additional);
 	}
 
