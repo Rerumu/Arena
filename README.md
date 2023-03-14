@@ -23,3 +23,4 @@ assert_eq!(arena[world], "World");
 - No `unsafe` code
 - Custom index types
 - Optional generational indices
+- `no_std` support

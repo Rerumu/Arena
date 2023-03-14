@@ -1,6 +1,6 @@
 //! Contains the arena iterator types.
 
-use std::iter::{Enumerate, FusedIterator};
+use core::iter::{Enumerate, FusedIterator};
 
 use crate::{
 	collection::{Arena, Entry},
@@ -11,7 +11,7 @@ macro_rules! impl_iterator {
 	($name:ident, $entry:ty, $value:ty, $ref:ident) => {
 		/// An iterator over the keys and values of the arena.
 		pub struct $name<'a, K: Key, V> {
-			pub(crate) buf: Enumerate<std::slice::$name<'a, Entry<V, K::Version>>>,
+			pub(crate) buf: Enumerate<core::slice::$name<'a, Entry<V, K::Version>>>,
 			pub(crate) len: usize,
 		}
 

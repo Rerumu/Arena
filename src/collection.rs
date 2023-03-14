@@ -1,6 +1,7 @@
 //! Contains the [`Arena`] type, which is the main type of this crate.
 
-use std::ops::{Index, IndexMut};
+use alloc::vec::Vec;
+use core::ops::{Index, IndexMut};
 
 use crate::{key::Key, version::Version};
 
@@ -39,7 +40,7 @@ impl<T, V: Version> Entry<T, V> {
 	}
 
 	fn set(&mut self, value: T) -> usize {
-		let old = std::mem::replace(&mut self.value, Value::Occupied { value });
+		let old = core::mem::replace(&mut self.value, Value::Occupied { value });
 
 		if let Value::Vacant { next } = old {
 			next
@@ -50,7 +51,7 @@ impl<T, V: Version> Entry<T, V> {
 
 	fn unset(&mut self, next: usize) -> Option<T> {
 		let version = self.version.increment()?;
-		let old = std::mem::replace(&mut self.value, Value::Vacant { next });
+		let old = core::mem::replace(&mut self.value, Value::Vacant { next });
 
 		if let Value::Occupied { value } = old {
 			self.version = version;

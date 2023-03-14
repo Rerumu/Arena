@@ -1,5 +1,3 @@
-#![forbid(unsafe_code)]
-
 //! The `Arena` is a data structure traditionally used for the bulk allocation of homogenous types. In this case, it is a free-list style implementation backed by a [`Vec`]. It supports removals and optional generational indices for solving the ABA problem where it matters.
 //!
 //! ## Example
@@ -22,6 +20,12 @@
 //! - No `unsafe` code
 //! - Custom index types
 //! - Optional generational indices
+//! - `no_std` support
+
+#![cfg_attr(not(any(doc, test)), no_std)]
+#![forbid(unsafe_code)]
+
+extern crate alloc;
 
 pub mod collection;
 pub mod iter;
