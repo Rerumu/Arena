@@ -1,7 +1,7 @@
 //! Contains the [`Version`] trait and a few default implementations.
 //! It is used to version entries in a collection.
 
-use std::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize};
+use core::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize};
 
 macro_rules! impl_checked {
 	($t:ty) => {
