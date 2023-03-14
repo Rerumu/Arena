@@ -106,6 +106,13 @@ impl<K: Key, V> Arena<K, V> {
 		self.next = 0;
 	}
 
+	/// Returns the total number of elements the [`Arena`] can hold without reallocating.
+	#[inline]
+	#[must_use]
+	pub fn capacity(&self) -> usize {
+		self.buf.capacity()
+	}
+
 	/// Reserves capacity for at least `additional` more elements to be
 	/// inserted in the given [`Arena`]. The collection may reserve more
 	/// space to speculatively avoid frequent reallocations.
