@@ -66,12 +66,14 @@ impl<V> core::fmt::Display for Id<V> {
 impl<T, V: Version> Index<Id<V>> for [T] {
 	type Output = T;
 
+	#[inline]
 	fn index(&self, id: Id<V>) -> &Self::Output {
 		Index::index(self, id.index())
 	}
 }
 
 impl<T, V: Version> IndexMut<Id<V>> for [T] {
+	#[inline]
 	fn index_mut(&mut self, id: Id<V>) -> &mut Self::Output {
 		IndexMut::index_mut(self, id.index())
 	}
@@ -80,12 +82,14 @@ impl<T, V: Version> IndexMut<Id<V>> for [T] {
 impl<T, V: Version> Index<Id<V>> for alloc::vec::Vec<T> {
 	type Output = T;
 
+	#[inline]
 	fn index(&self, id: Id<V>) -> &Self::Output {
 		Index::index(self, id.index())
 	}
 }
 
 impl<T, V: Version> IndexMut<Id<V>> for alloc::vec::Vec<T> {
+	#[inline]
 	fn index_mut(&mut self, id: Id<V>) -> &mut Self::Output {
 		IndexMut::index_mut(self, id.index())
 	}
