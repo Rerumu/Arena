@@ -1,7 +1,10 @@
 //! Contains the [`Key`] trait and a default implementation.
 //! It is used to identify entries in an arena.
 
-use core::num::NonZeroU32;
+use core::{
+	num::NonZeroU32,
+	ops::{Index, IndexMut},
+};
 
 use crate::version::Version;
 
@@ -57,5 +60,19 @@ impl<V: Version> Default for Id<V> {
 impl<V> core::fmt::Display for Id<V> {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "I{}", self.index)
+	}
+}
+
+impl<T, V: Version> Index<Id<V>> for [T] {
+	type Output = T;
+
+	fn index(&self, id: Id<V>) -> &Self::Output {
+		Index::index(self, id.index())
+	}
+}
+
+impl<T, V: Version> IndexMut<Id<V>> for [T] {
+	fn index_mut(&mut self, id: Id<V>) -> &mut Self::Output {
+		IndexMut::index_mut(self, id.index())
 	}
 }
