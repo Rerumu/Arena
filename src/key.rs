@@ -45,10 +45,7 @@ impl<V: Version> Key for Id<V> {
 	}
 }
 
-impl<V> Default for Id<V>
-where
-	V: Version,
-{
+impl<V: Version> Default for Id<V> {
 	fn default() -> Self {
 		let index = u32::MAX;
 		let version = V::new();
