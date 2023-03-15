@@ -211,14 +211,16 @@ impl<K: Key, V> Arena<K, V> {
 	/// Attempts to remove a value from the [`Arena`], returning the value if successful.
 	#[inline]
 	pub fn try_remove(&mut self, key: K) -> Option<V> {
+		let index = key.index();
+
 		let old = self
 			.buf
-			.get_mut(key.index())
+			.get_mut(index)
 			.filter(|entry| has_version(key, entry))
 			.and_then(|entry| entry.unset(self.next))?;
 
 		self.len -= 1;
-		self.next = key.index();
+		self.next = index;
 
 		Some(old)
 	}
