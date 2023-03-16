@@ -58,7 +58,9 @@ impl<T, V: Version> Entry<T, V> {
 
 			Some(value)
 		} else {
-			unreachable!()
+			self.value = old;
+
+			None
 		}
 	}
 }
@@ -290,7 +292,7 @@ impl<K: Key, V> IndexMut<K> for Arena<K, V> {
 
 #[cfg(test)]
 mod test {
-	use crate::key::Id;
+	use crate::{key::Id, version::Nil};
 
 	use super::Arena;
 
@@ -324,6 +326,16 @@ mod test {
 	#[test]
 	fn remove_twice() {
 		let mut arena = Arena::<Id, usize>::new();
+
+		let a = arena.insert(10);
+
+		assert_eq!(arena.try_remove(a), Some(10));
+		assert_eq!(arena.try_remove(a), None);
+	}
+
+	#[test]
+	fn remove_twice_nil() {
+		let mut arena = Arena::<Id<Nil>, usize>::new();
 
 		let a = arena.insert(10);
 
