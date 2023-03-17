@@ -11,6 +11,13 @@ pub(crate) enum Value<T> {
 }
 
 impl<T> Value<T> {
+	pub fn into_inner(self) -> Option<T> {
+		match self {
+			Self::Occupied { value } => Some(value),
+			Self::Vacant { .. } => None,
+		}
+	}
+
 	pub fn as_ref(&self) -> Option<&T> {
 		match self {
 			Self::Occupied { value } => Some(value),
