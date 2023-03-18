@@ -175,6 +175,13 @@ impl<K: Key, V> Arena<K, V> {
 			.and_then(|element| element.value.as_mut())
 	}
 
+	/// Returns `true` if the [`Arena`] contains the key.
+	#[inline]
+	#[must_use]
+	pub fn contains_key(&self, key: K) -> bool {
+		self.get(key).is_some()
+	}
+
 	#[inline]
 	fn key_at_next(&self) -> Option<K> {
 		let entry = self.buf.get(self.next);
