@@ -299,6 +299,11 @@ impl<K: Key, V> Default for Arena<K, V> {
 
 impl<K: Key, V> Extend<V> for Arena<K, V> {
 	fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
+		let iter = iter.into_iter();
+
+		let (lower, _) = iter.size_hint();
+		self.reserve(lower);
+
 		for value in iter {
 			let _ = self.insert(value);
 		}
