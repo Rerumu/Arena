@@ -39,6 +39,13 @@ pub(crate) struct Entry<T, V> {
 }
 
 impl<T, V: Version> Entry<T, V> {
+	fn occupied(value: T) -> Self {
+		Self {
+			value: Value::Occupied { value },
+			version: V::new(),
+		}
+	}
+
 	fn vacant(next: usize) -> Self {
 		Self {
 			value: Value::Vacant { next },
@@ -290,6 +297,27 @@ impl<K: Key, V> Default for Arena<K, V> {
 	}
 }
 
+impl<K: Key, V> Extend<V> for Arena<K, V> {
+	fn extend<I: IntoIterator<Item = V>>(&mut self, iter: I) {
+		for value in iter {
+			let _ = self.insert(value);
+		}
+	}
+}
+
+impl<K: Key, V> FromIterator<V> for Arena<K, V> {
+	fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
+		let buf = iter.into_iter().map(Entry::occupied).collect::<Vec<_>>();
+		let len = buf.len();
+
+		Self {
+			buf,
+			len,
+			next: len,
+		}
+	}
+}
+
 impl<K: Key, V> Index<K> for Arena<K, V> {
 	type Output = V;
 
@@ -357,5 +385,32 @@ mod test {
 
 		assert_eq!(arena.try_remove(a), Some(10));
 		assert_eq!(arena.try_remove(a), None);
+	}
+
+	#[test]
+	fn extend() {
+		let mut arena = Arena::<Id, usize>::new();
+		arena.extend([10, 20, 30]);
+
+		assert_eq!(arena.len(), 3);
+
+		let _ = arena.insert(40);
+		let _ = arena.insert(50);
+		let _ = arena.insert(60);
+
+		assert_eq!(arena.len(), 6);
+	}
+
+	#[test]
+	fn from_iter() {
+		let mut arena = Arena::<Id, usize>::from_iter([10, 20, 30]);
+
+		assert_eq!(arena.len(), 3);
+
+		let _ = arena.insert(40);
+		let _ = arena.insert(50);
+		let _ = arena.insert(60);
+
+		assert_eq!(arena.len(), 6);
 	}
 }
