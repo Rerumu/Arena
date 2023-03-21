@@ -139,6 +139,16 @@ impl<K: Key, V> Arena<K, V> {
 		self.buf.reserve_exact(additional);
 	}
 
+	/// Shrinks the capacity of the vector as much as possible.
+	pub fn shrink_to_fit(&mut self) {
+		self.buf.shrink_to_fit();
+	}
+
+	/// Shrinks the capacity of the vector with a lower bound.
+	pub fn shrink_to(&mut self, min_capacity: usize) {
+		self.buf.shrink_to(min_capacity);
+	}
+
 	/// Returns the number of elements in the [`Arena`].
 	#[inline]
 	#[must_use]
