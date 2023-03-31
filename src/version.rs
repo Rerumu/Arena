@@ -1,7 +1,7 @@
 //! Contains the [`Version`] trait and a few default implementations.
 //! It is used to version entries in a collection.
 
-use core::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize};
+use core::num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, Wrapping};
 
 macro_rules! impl_checked {
 	($t:ty) => {
@@ -40,12 +40,6 @@ impl Version for Nil {
 		Some(Self)
 	}
 }
-
-/// A versioning strategy that wraps around the underlying type.
-/// It is useful when you want to avoid the ABA problem but don't
-/// care about the chance of a collision.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
-pub struct Wrapping<T>(T);
 
 impl<T: Version> Version for Wrapping<T> {
 	fn new() -> Self {
