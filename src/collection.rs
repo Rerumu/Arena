@@ -5,6 +5,7 @@ use core::ops::{Index, IndexMut};
 
 use crate::{key::Key, version::Version};
 
+#[derive(Clone, Debug)]
 pub(crate) enum Value<T> {
 	Occupied { value: T },
 	Vacant { next: usize },
@@ -33,6 +34,7 @@ impl<T> Value<T> {
 	}
 }
 
+#[derive(Clone, Debug)]
 pub(crate) struct Entry<T, V> {
 	pub value: Value<T>,
 	pub version: V,
