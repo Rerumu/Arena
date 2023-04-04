@@ -265,6 +265,56 @@ impl<'a, K: Key, V> IntoIterator for &'a mut Arena<K, V> {
 	}
 }
 
+impl<K: Key, V: Clone> Clone for IntoIter<K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			buf: self.buf.clone(),
+			len: self.len,
+		}
+	}
+}
+
+impl<'a, K: Key, V> Clone for Iter<'a, K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			buf: self.buf.clone(),
+			len: self.len,
+		}
+	}
+}
+
+impl<K: Key, V: Clone> Clone for IntoKeys<K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			iter: self.iter.clone(),
+		}
+	}
+}
+
+impl<'a, K: Key, V> Clone for Keys<'a, K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			iter: self.iter.clone(),
+		}
+	}
+}
+
+impl<K: Key, V: Clone> Clone for IntoValues<K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			iter: self.iter.clone(),
+		}
+	}
+}
+
+impl<'a, K: Key, V> Clone for Values<'a, K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			iter: self.iter.clone(),
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::{

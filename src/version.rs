@@ -28,7 +28,7 @@ pub trait Version: PartialEq + Copy {
 
 /// A no-op versioning strategy. It is useful when you don't care
 /// about the ABA problem.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug, Default)]
 pub struct Nil;
 
 impl Version for Nil {
