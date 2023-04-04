@@ -1,7 +1,10 @@
 //! Contains the [`Arena`] type, which is the main type of this crate.
 
 use alloc::vec::Vec;
-use core::ops::{Index, IndexMut};
+use core::{
+	fmt::{self, Debug, Formatter},
+	ops::{Index, IndexMut},
+};
 
 use crate::{key::Key, version::Version};
 
@@ -299,6 +302,22 @@ impl<K: Key, V> Default for Arena<K, V> {
 	#[inline]
 	fn default() -> Self {
 		Self::new()
+	}
+}
+
+impl<K: Key, V: Clone> Clone for Arena<K, V> {
+	fn clone(&self) -> Self {
+		Self {
+			buf: self.buf.clone(),
+			len: self.len,
+			next: self.next,
+		}
+	}
+}
+
+impl<K: Key + Debug, V: Debug> Debug for Arena<K, V> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_map().entries(self.iter()).finish()
 	}
 }
 
