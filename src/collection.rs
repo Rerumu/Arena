@@ -263,10 +263,10 @@ impl<K: Key, V> Arena<K, V> {
 				let key = K::new(i, entry.version).unwrap_or_else(|| unreachable!());
 
 				if !f(key, value) {
+					entry.unset(self.next);
 					self.next = i;
 					self.len -= 1;
 					remaining -= 1;
-					entry.unset(self.next);
 				}
 			}
 		}
@@ -285,10 +285,10 @@ impl<K: Key, V> Arena<K, V> {
 				let key = K::new(i, entry.version).unwrap_or_else(|| unreachable!());
 
 				if !f(key, value) {
+					entry.unset(self.next);
 					self.next = i;
 					self.len -= 1;
 					remaining -= 1;
-					entry.unset(self.next);
 				}
 			}
 		}
