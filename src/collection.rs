@@ -190,6 +190,13 @@ impl<K: Key, V> Arena<K, V> {
 			.and_then(|element| element.value.as_mut())
 	}
 
+	/// Returns the key to the last occupied slot of the [`Arena`].
+	#[inline]
+	#[must_use]
+	pub fn last_key(&self) -> Option<K> {
+		self.keys().next_back()
+	}
+
 	/// Returns `true` if the [`Arena`] contains the key.
 	#[inline]
 	#[must_use]
