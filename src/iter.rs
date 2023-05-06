@@ -13,12 +13,12 @@ macro_rules! impl_iterator {
 		$name:ident$(<$lt:lifetime>)?, $iter:ident, $entry:ty, $value:ty, $extract:ident
 	) => {
 		$(#[$attr])*
-		pub struct $name<$($lt,)? K: Key, V> {
-			pub(crate) buf: Enumerate<$iter<$($lt,)? Entry<V, K::Version>>>,
+		pub struct $name<$($lt,)? K: Key, T> {
+			pub(crate) buf: Enumerate<$iter<$($lt,)? Entry<K::Version, T>>>,
 			pub(crate) len: usize,
 		}
 
-		impl<$($lt,)? K: Key, V> $name<$($lt,)? K, V> {
+		impl<$($lt,)? K: Key, T> $name<$($lt,)? K, T> {
 			#[inline]
 			fn ref_next<I>(mut iter: I) -> Option<(K, $value)>
 			where
@@ -33,7 +33,7 @@ macro_rules! impl_iterator {
 			}
 		}
 
-		impl<$($lt,)? K: Key, V> Iterator for $name<$($lt,)? K, V> {
+		impl<$($lt,)? K: Key, T> Iterator for $name<$($lt,)? K, T> {
 			type Item = (K, $value);
 
 			#[inline]
@@ -54,7 +54,7 @@ macro_rules! impl_iterator {
 			}
 		}
 
-		impl<$($lt,)? K: Key, V> DoubleEndedIterator for $name<$($lt,)? K, V> {
+		impl<$($lt,)? K: Key, T> DoubleEndedIterator for $name<$($lt,)? K, T> {
 			#[inline]
 			fn next_back(&mut self) -> Option<Self::Item> {
 				self.len = self.len.checked_sub(1)?;
@@ -63,9 +63,9 @@ macro_rules! impl_iterator {
 			}
 		}
 
-		impl<$($lt,)? K: Key, V> ExactSizeIterator for $name<$($lt,)? K, V> {}
+		impl<$($lt,)? K: Key, T> ExactSizeIterator for $name<$($lt,)? K, T> {}
 
-		impl<$($lt,)? K: Key, V> FusedIterator for $name<$($lt,)? K, V> {}
+		impl<$($lt,)? K: Key, T> FusedIterator for $name<$($lt,)? K, T> {}
 	};
 }
 
@@ -77,21 +77,21 @@ impl_iterator!(
 	/// A consuming iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::into_iter`] method.
-	IntoIter, InnerIntoIter, Entry<V, K::Version>, V, into_inner
+	IntoIter, InnerIntoIter, Entry<K::Version, T>, T, into_inner
 );
 impl_iterator!(
 	/// An iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::iter`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Iter<'a>, InnerIter, &'a Entry<V, K::Version>, &'a V, as_ref
+	Iter<'a>, InnerIter, &'a Entry<K::Version, T>, &'a T, as_ref
 );
 impl_iterator!(
 	/// A mutable iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::iter_mut`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IterMut<'a>, InnerIterMut, &'a mut Entry<V, K::Version>, &'a mut V, as_mut
+	IterMut<'a>, InnerIterMut, &'a mut Entry<K::Version, T>, &'a mut T, as_mut
 );
 
 macro_rules! impl_wrapper {
@@ -100,11 +100,11 @@ macro_rules! impl_wrapper {
 		$name:ident$(<$lt:lifetime>)?, $iter:ty, $item:ty, $extract:expr
 	) => {
 		$(#[$attr])*
-		pub struct $name<$($lt,)? K: Key, V> {
+		pub struct $name<$($lt,)? K: Key, T> {
 			iter: $iter,
 		}
 
-		impl<$($lt,)? K: Key, V> Iterator for $name<$($lt,)? K, V> {
+		impl<$($lt,)? K: Key, T> Iterator for $name<$($lt,)? K, T> {
 			type Item = $item;
 
 			#[inline]
@@ -123,16 +123,16 @@ macro_rules! impl_wrapper {
 			}
 		}
 
-		impl<$($lt,)? K: Key, V> DoubleEndedIterator for $name<$($lt,)? K, V> {
+		impl<$($lt,)? K: Key, T> DoubleEndedIterator for $name<$($lt,)? K, T> {
 			#[inline]
 			fn next_back(&mut self) -> Option<Self::Item> {
 				self.iter.next_back().map($extract)
 			}
 		}
 
-		impl<$($lt,)? K: Key, V> ExactSizeIterator for $name<$($lt,)? K, V> {}
+		impl<$($lt,)? K: Key, T> ExactSizeIterator for $name<$($lt,)? K, T> {}
 
-		impl<$($lt,)? K: Key, V> FusedIterator for $name<$($lt,)? K, V> {}
+		impl<$($lt,)? K: Key, T> FusedIterator for $name<$($lt,)? K, T> {}
 	};
 }
 
@@ -142,41 +142,41 @@ impl_wrapper!(
 	///
 	/// Created by the [`Arena::into_keys`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IntoKeys, IntoIter<K, V>, K, |entry| entry.0
+	IntoKeys, IntoIter<K, T>, K, |entry| entry.0
 );
 impl_wrapper!(
 	/// An iterator over the keys of the [`Arena`].
 	///
 	/// Created by the [`Arena::keys`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Keys<'a>, Iter<'a, K, V>, K, |entry| entry.0
+	Keys<'a>, Iter<'a, K, T>, K, |entry| entry.0
 );
 impl_wrapper!(
 	/// A consuming iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::into_values`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IntoValues, IntoIter<K, V>, V, |entry| entry.1
+	IntoValues, IntoIter<K, T>, T, |entry| entry.1
 );
 impl_wrapper!(
 	/// An iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::values`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Values<'a>, Iter<'a, K, V>, &'a V, |entry| entry.1
+	Values<'a>, Iter<'a, K, T>, &'a T, |entry| entry.1
 );
 impl_wrapper!(
 	/// A mutable iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::values_mut`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	ValuesMut<'a>, IterMut<'a, K, V>, &'a mut V, |entry| entry.1
+	ValuesMut<'a>, IterMut<'a, K, T>, &'a mut T, |entry| entry.1
 );
 
-impl<K: Key, V> Arena<K, V> {
+impl<K: Key, T> Arena<K, T> {
 	/// Returns an iterator over the keys and values of the [`Arena`].
 	#[inline]
-	pub fn iter(&self) -> Iter<'_, K, V> {
+	pub fn iter(&self) -> Iter<'_, K, T> {
 		let len = self.len();
 		let buf = self.buf.iter().enumerate();
 
@@ -185,7 +185,7 @@ impl<K: Key, V> Arena<K, V> {
 
 	/// Returns a mutable iterator over the keys and values of the [`Arena`].
 	#[inline]
-	pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+	pub fn iter_mut(&mut self) -> IterMut<'_, K, T> {
 		let len = self.len();
 		let buf = self.buf.iter_mut().enumerate();
 
@@ -194,7 +194,7 @@ impl<K: Key, V> Arena<K, V> {
 
 	/// Returns a consuming iterator over the keys of the [`Arena`].
 	#[inline]
-	pub fn into_keys(self) -> IntoKeys<K, V> {
+	pub fn into_keys(self) -> IntoKeys<K, T> {
 		IntoKeys {
 			iter: self.into_iter(),
 		}
@@ -202,13 +202,13 @@ impl<K: Key, V> Arena<K, V> {
 
 	/// Returns an iterator over the keys of the [`Arena`].
 	#[inline]
-	pub fn keys(&self) -> Keys<'_, K, V> {
+	pub fn keys(&self) -> Keys<'_, K, T> {
 		Keys { iter: self.iter() }
 	}
 
 	/// Returns a consuming iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn into_values(self) -> IntoValues<K, V> {
+	pub fn into_values(self) -> IntoValues<K, T> {
 		IntoValues {
 			iter: self.into_iter(),
 		}
@@ -216,22 +216,22 @@ impl<K: Key, V> Arena<K, V> {
 
 	/// Returns an iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn values(&self) -> Values<'_, K, V> {
+	pub fn values(&self) -> Values<'_, K, T> {
 		Values { iter: self.iter() }
 	}
 
 	/// Returns a mutable iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+	pub fn values_mut(&mut self) -> ValuesMut<'_, K, T> {
 		ValuesMut {
 			iter: self.iter_mut(),
 		}
 	}
 }
 
-impl<K: Key, V> IntoIterator for Arena<K, V> {
-	type Item = (K, V);
-	type IntoIter = IntoIter<K, V>;
+impl<K: Key, T> IntoIterator for Arena<K, T> {
+	type Item = (K, T);
+	type IntoIter = IntoIter<K, T>;
 
 	/// Returns a consuming iterator over the keys and values of the [`Arena`].
 	#[inline]
@@ -243,9 +243,9 @@ impl<K: Key, V> IntoIterator for Arena<K, V> {
 	}
 }
 
-impl<'a, K: Key, V> IntoIterator for &'a Arena<K, V> {
-	type Item = (K, &'a V);
-	type IntoIter = Iter<'a, K, V>;
+impl<'a, K: Key, T> IntoIterator for &'a Arena<K, T> {
+	type Item = (K, &'a T);
+	type IntoIter = Iter<'a, K, T>;
 
 	/// See [`iter`](`Arena::iter`).
 	#[inline]
@@ -254,9 +254,9 @@ impl<'a, K: Key, V> IntoIterator for &'a Arena<K, V> {
 	}
 }
 
-impl<'a, K: Key, V> IntoIterator for &'a mut Arena<K, V> {
-	type Item = (K, &'a mut V);
-	type IntoIter = IterMut<'a, K, V>;
+impl<'a, K: Key, T> IntoIterator for &'a mut Arena<K, T> {
+	type Item = (K, &'a mut T);
+	type IntoIter = IterMut<'a, K, T>;
 
 	/// See [`iter_mut`](`Arena::iter_mut`).
 	#[inline]
@@ -265,7 +265,7 @@ impl<'a, K: Key, V> IntoIterator for &'a mut Arena<K, V> {
 	}
 }
 
-impl<K: Key, V: Clone> Clone for IntoIter<K, V> {
+impl<K: Key, T: Clone> Clone for IntoIter<K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			buf: self.buf.clone(),
@@ -274,7 +274,7 @@ impl<K: Key, V: Clone> Clone for IntoIter<K, V> {
 	}
 }
 
-impl<'a, K: Key, V> Clone for Iter<'a, K, V> {
+impl<'a, K: Key, T> Clone for Iter<'a, K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			buf: self.buf.clone(),
@@ -283,7 +283,7 @@ impl<'a, K: Key, V> Clone for Iter<'a, K, V> {
 	}
 }
 
-impl<K: Key, V: Clone> Clone for IntoKeys<K, V> {
+impl<K: Key, T: Clone> Clone for IntoKeys<K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -291,7 +291,7 @@ impl<K: Key, V: Clone> Clone for IntoKeys<K, V> {
 	}
 }
 
-impl<'a, K: Key, V> Clone for Keys<'a, K, V> {
+impl<'a, K: Key, T> Clone for Keys<'a, K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -299,7 +299,7 @@ impl<'a, K: Key, V> Clone for Keys<'a, K, V> {
 	}
 }
 
-impl<K: Key, V: Clone> Clone for IntoValues<K, V> {
+impl<K: Key, T: Clone> Clone for IntoValues<K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -307,7 +307,7 @@ impl<K: Key, V: Clone> Clone for IntoValues<K, V> {
 	}
 }
 
-impl<'a, K: Key, V> Clone for Values<'a, K, V> {
+impl<'a, K: Key, T> Clone for Values<'a, K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),

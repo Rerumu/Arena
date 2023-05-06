@@ -38,16 +38,16 @@ impl<T> Value<T> {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct Entry<T, V> {
+pub(crate) struct Entry<G, T> {
 	pub value: Value<T>,
-	pub version: V,
+	pub version: G,
 }
 
-impl<T, V: Version> Entry<T, V> {
+impl<G: Version, T> Entry<G, T> {
 	fn vacant(next: usize) -> Self {
 		Self {
 			value: Value::Vacant { next },
-			version: V::new(),
+			version: G::new(),
 		}
 	}
 
@@ -77,19 +77,19 @@ impl<T, V: Version> Entry<T, V> {
 	}
 }
 
-fn has_version<K: Key, T>(key: K, entry: &Entry<T, K::Version>) -> bool {
+fn has_version<K: Key, T>(key: K, entry: &Entry<K::Version, T>) -> bool {
 	key.version() == entry.version
 }
 
 /// An [`Arena`] is a collection of values that can be accessed by a [`Key`].
 /// It is similar to a [`Vec`], but it has stable and reusable indices.
-pub struct Arena<K: Key, V> {
-	pub(crate) buf: Vec<Entry<V, K::Version>>,
+pub struct Arena<K: Key, T> {
+	pub(crate) buf: Vec<Entry<K::Version, T>>,
 	pub(crate) len: usize,
 	pub(crate) next: usize,
 }
 
-impl<K: Key, V> Arena<K, V> {
+impl<K: Key, T> Arena<K, T> {
 	/// Creates a new, empty [`Arena`].
 	#[inline]
 	#[must_use]
@@ -171,7 +171,7 @@ impl<K: Key, V> Arena<K, V> {
 	/// Returns a reference to the value corresponding to the key.
 	#[inline]
 	#[must_use]
-	pub fn get(&self, key: K) -> Option<&V> {
+	pub fn get(&self, key: K) -> Option<&T> {
 		let entry = self.buf.get(key.index());
 
 		entry
@@ -182,7 +182,7 @@ impl<K: Key, V> Arena<K, V> {
 	/// Returns a mutable reference to the value corresponding to the key.
 	#[inline]
 	#[must_use]
-	pub fn get_mut(&mut self, key: K) -> Option<&mut V> {
+	pub fn get_mut(&mut self, key: K) -> Option<&mut T> {
 		let entry = self.buf.get_mut(key.index());
 
 		entry
@@ -215,7 +215,7 @@ impl<K: Key, V> Arena<K, V> {
 	/// Attempts to insert a value into the [`Arena`], returning the key if successful.
 	#[inline]
 	#[must_use]
-	pub fn try_insert(&mut self, value: V) -> Option<K> {
+	pub fn try_insert(&mut self, value: T) -> Option<K> {
 		let key = self.key_at_next()?;
 
 		if self.next == self.buf.len() {
@@ -233,13 +233,13 @@ impl<K: Key, V> Arena<K, V> {
 	/// Inserts a value into the [`Arena`], returning the key.
 	#[inline]
 	#[must_use]
-	pub fn insert(&mut self, value: V) -> K {
+	pub fn insert(&mut self, value: T) -> K {
 		self.try_insert(value).expect("arena is full")
 	}
 
 	/// Attempts to remove a value from the [`Arena`], returning the value if successful.
 	#[inline]
-	pub fn try_remove(&mut self, key: K) -> Option<V> {
+	pub fn try_remove(&mut self, key: K) -> Option<T> {
 		let index = key.index();
 
 		let old = self
@@ -256,12 +256,12 @@ impl<K: Key, V> Arena<K, V> {
 
 	/// Removes a value from the [`Arena`], returning the value.
 	#[inline]
-	pub fn remove(&mut self, key: K) -> V {
+	pub fn remove(&mut self, key: K) -> T {
 		self.try_remove(key).expect("invalid key")
 	}
 
 	/// Retains only the elements specified by the predicate.
-	pub fn retain(&mut self, mut f: impl FnMut(K, &V) -> bool) {
+	pub fn retain(&mut self, mut f: impl FnMut(K, &T) -> bool) {
 		let mut remaining = self.len();
 
 		for (i, entry) in self.buf.iter_mut().enumerate() {
@@ -283,7 +283,7 @@ impl<K: Key, V> Arena<K, V> {
 	}
 
 	/// Retains only the elements specified by the predicate, passing a mutable reference to it.
-	pub fn retain_mut(&mut self, mut f: impl FnMut(K, &mut V) -> bool) {
+	pub fn retain_mut(&mut self, mut f: impl FnMut(K, &mut T) -> bool) {
 		let mut remaining = self.len();
 
 		for (i, entry) in self.buf.iter_mut().enumerate() {
@@ -305,14 +305,14 @@ impl<K: Key, V> Arena<K, V> {
 	}
 }
 
-impl<K: Key, V> Default for Arena<K, V> {
+impl<K: Key, T> Default for Arena<K, T> {
 	#[inline]
 	fn default() -> Self {
 		Self::new()
 	}
 }
 
-impl<K: Key, V: Clone> Clone for Arena<K, V> {
+impl<K: Key, T: Clone> Clone for Arena<K, T> {
 	fn clone(&self) -> Self {
 		Self {
 			buf: self.buf.clone(),
@@ -322,14 +322,14 @@ impl<K: Key, V: Clone> Clone for Arena<K, V> {
 	}
 }
 
-impl<K: Key + Debug, V: Debug> Debug for Arena<K, V> {
+impl<K: Key + Debug, T: Debug> Debug for Arena<K, T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		f.debug_map().entries(self.iter()).finish()
 	}
 }
 
-impl<K: Key, V> Index<K> for Arena<K, V> {
-	type Output = V;
+impl<K: Key, T> Index<K> for Arena<K, T> {
+	type Output = T;
 
 	#[inline]
 	fn index(&self, key: K) -> &Self::Output {
@@ -337,7 +337,7 @@ impl<K: Key, V> Index<K> for Arena<K, V> {
 	}
 }
 
-impl<K: Key, V> IndexMut<K> for Arena<K, V> {
+impl<K: Key, T> IndexMut<K> for Arena<K, T> {
 	#[inline]
 	fn index_mut(&mut self, key: K) -> &mut Self::Output {
 		self.get_mut(key).expect("invalid key")

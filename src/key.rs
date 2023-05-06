@@ -27,13 +27,13 @@ pub trait Key: Copy {
 /// A well rounded key type that can be used in most situations.
 /// It is a 32-bit unsigned integer with a generic versioning strategy.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Clone, Copy, Debug)]
-pub struct Id<V = NonZeroU32> {
+pub struct Id<G = NonZeroU32> {
 	index: u32,
-	version: V,
+	version: G,
 }
 
-impl<V: Version> Key for Id<V> {
-	type Version = V;
+impl<G: Version> Key for Id<G> {
+	type Version = G;
 
 	fn new(index: usize, version: Self::Version) -> Option<Self> {
 		index.try_into().ok().map(|index| Self { index, version })
@@ -48,49 +48,49 @@ impl<V: Version> Key for Id<V> {
 	}
 }
 
-impl<V: Version> Default for Id<V> {
+impl<G: Version> Default for Id<G> {
 	fn default() -> Self {
 		let index = u32::MAX;
-		let version = V::new();
+		let version = G::new();
 
 		Self { index, version }
 	}
 }
 
-impl<V> core::fmt::Display for Id<V> {
+impl<G> core::fmt::Display for Id<G> {
 	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		write!(f, "I{}", self.index)
 	}
 }
 
-impl<T, V: Version> Index<Id<V>> for [T] {
+impl<G: Version, T> Index<Id<G>> for [T] {
 	type Output = T;
 
 	#[inline]
-	fn index(&self, id: Id<V>) -> &Self::Output {
+	fn index(&self, id: Id<G>) -> &Self::Output {
 		Index::index(self, id.index())
 	}
 }
 
-impl<T, V: Version> IndexMut<Id<V>> for [T] {
+impl<G: Version, T> IndexMut<Id<G>> for [T] {
 	#[inline]
-	fn index_mut(&mut self, id: Id<V>) -> &mut Self::Output {
+	fn index_mut(&mut self, id: Id<G>) -> &mut Self::Output {
 		IndexMut::index_mut(self, id.index())
 	}
 }
 
-impl<T, V: Version> Index<Id<V>> for alloc::vec::Vec<T> {
+impl<G: Version, T> Index<Id<G>> for alloc::vec::Vec<T> {
 	type Output = T;
 
 	#[inline]
-	fn index(&self, id: Id<V>) -> &Self::Output {
+	fn index(&self, id: Id<G>) -> &Self::Output {
 		Index::index(self, id.index())
 	}
 }
 
-impl<T, V: Version> IndexMut<Id<V>> for alloc::vec::Vec<T> {
+impl<G: Version, T> IndexMut<Id<G>> for alloc::vec::Vec<T> {
 	#[inline]
-	fn index_mut(&mut self, id: Id<V>) -> &mut Self::Output {
+	fn index_mut(&mut self, id: Id<G>) -> &mut Self::Output {
 		IndexMut::index_mut(self, id.index())
 	}
 }
