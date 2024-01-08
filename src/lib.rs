@@ -3,7 +3,7 @@
 //! ## Example
 //!
 //! ```rust
-//! # use arena::{collection::Arena, key::Id};
+//! # use arena::{collection::Arena, referent::Id};
 //! let mut arena = Arena::<Id, &str>::new();
 //!
 //! let hello = arena.insert("Hello");
@@ -17,17 +17,17 @@
 //!
 //! - `O(1)` insertion and removal
 //! - `O(1)` access to elements by key
-//! - No `unsafe` code
-//! - Custom index types
-//! - Optional generational indices
 //! - `no_std` support
+//! - No `unsafe` code
+//! - Optional generational indices
 
 #![cfg_attr(not(any(doc, test)), no_std)]
 #![forbid(unsafe_code)]
 
 extern crate alloc;
 
+mod element;
+
 pub mod collection;
 pub mod iter;
-pub mod key;
-pub mod version;
+pub mod referent;

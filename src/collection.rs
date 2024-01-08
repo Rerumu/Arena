@@ -1,354 +1,269 @@
-//! Contains the [`Arena`] type, which is the main type of this crate.
-
-use alloc::vec::Vec;
 use core::{
-	fmt::{self, Debug, Formatter},
+	fmt::Debug,
 	ops::{Index, IndexMut},
 };
 
-use crate::{key::Key, version::Version};
+use crate::{
+	element::{Element, List},
+	referent::{try_transform, Referent, Similar},
+};
 
-#[derive(Clone, Debug)]
-pub(crate) enum Value<T> {
-	Occupied { value: T },
-	Vacant { next: usize },
+/// An [`Arena`] is a collection of values that can be accessed by a [`Referent`].
+/// It is similar to a `Vec`, but it has stable and reusable indices.
+#[derive(Clone)]
+pub struct Arena<Key: Referent, Value> {
+	pub(crate) elements: List<Key::Version, Key::Index, Value>,
+	pub(crate) len: Key::Index,
+	pub(crate) next: Key::Index,
 }
 
-impl<T> Value<T> {
-	pub fn into_inner(self) -> Option<T> {
-		match self {
-			Self::Occupied { value } => Some(value),
-			Self::Vacant { .. } => None,
-		}
-	}
-
-	pub fn as_ref(&self) -> Option<&T> {
-		match self {
-			Self::Occupied { value } => Some(value),
-			Self::Vacant { .. } => None,
-		}
-	}
-
-	pub fn as_mut(&mut self) -> Option<&mut T> {
-		match self {
-			Self::Occupied { value } => Some(value),
-			Self::Vacant { .. } => None,
-		}
-	}
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct Entry<G, T> {
-	pub value: Value<T>,
-	pub version: G,
-}
-
-impl<G: Version, T> Entry<G, T> {
-	fn vacant(next: usize) -> Self {
+impl<Key: Referent, Value> Default for Arena<Key, Value> {
+	#[inline]
+	fn default() -> Self {
 		Self {
-			value: Value::Vacant { next },
-			version: G::new(),
-		}
-	}
-
-	fn set(&mut self, value: T) -> usize {
-		let old = core::mem::replace(&mut self.value, Value::Occupied { value });
-
-		if let Value::Vacant { next } = old {
-			next
-		} else {
-			unreachable!()
-		}
-	}
-
-	fn unset(&mut self, next: usize) -> Option<T> {
-		let version = self.version.increment()?;
-		let old = core::mem::replace(&mut self.value, Value::Vacant { next });
-
-		if let Value::Occupied { value } = old {
-			self.version = version;
-
-			Some(value)
-		} else {
-			self.value = old;
-
-			None
+			elements: List::default(),
+			len: Key::Index::MIN,
+			next: Key::Index::MIN,
 		}
 	}
 }
 
-fn has_version<K: Key, T>(key: K, entry: &Entry<K::Version, T>) -> bool {
-	key.version() == entry.version
-}
-
-/// An [`Arena`] is a collection of values that can be accessed by a [`Key`].
-/// It is similar to a [`Vec`], but it has stable and reusable indices.
-pub struct Arena<K: Key, T> {
-	pub(crate) buf: Vec<Entry<K::Version, T>>,
-	pub(crate) len: usize,
-	pub(crate) next: usize,
-}
-
-impl<K: Key, T> Arena<K, T> {
+impl<Key: Referent, Value> Arena<Key, Value> {
 	/// Creates a new, empty [`Arena`].
 	#[inline]
 	#[must_use]
-	pub const fn new() -> Self {
-		Self {
-			buf: Vec::new(),
-			len: 0,
-			next: 0,
-		}
+	pub fn new() -> Self {
+		// This will be `const` whenever a safe `const` way of initializing
+		// an empty array `Box` is available.
+		Self::default()
 	}
 
 	/// Creates a new, empty [`Arena`] with the specified capacity.
 	#[inline]
 	#[must_use]
 	pub fn with_capacity(capacity: usize) -> Self {
-		Self {
-			buf: Vec::with_capacity(capacity),
-			len: 0,
-			next: 0,
-		}
+		let mut arena = Self::new();
+
+		arena.reserve_exact(capacity);
+
+		arena
 	}
 
-	/// Clears the [`Arena`], removing all values.
-	#[inline]
-	pub fn clear(&mut self) {
-		self.buf.clear();
-		self.len = 0;
-		self.next = 0;
-	}
-
-	/// Returns the total number of elements the [`Arena`] can hold without reallocating.
+	/// Returns the number of elements the [`Arena`] can hold without reallocating.
 	#[inline]
 	#[must_use]
-	pub fn capacity(&self) -> usize {
-		self.buf.capacity()
-	}
-
-	/// Reserves capacity for at least `additional` more elements to be
-	/// inserted in the given [`Arena`]. The collection may reserve more
-	/// space to speculatively avoid frequent reallocations.
-	pub fn reserve(&mut self, additional: usize) {
-		let additional = additional.saturating_sub(self.capacity() - self.len());
-
-		self.buf.reserve(additional);
-	}
-
-	/// Reserves the minimum capacity for exactly `additional` more elements to be
-	/// inserted in the given [`Arena`].
-	pub fn reserve_exact(&mut self, additional: usize) {
-		let additional = additional.saturating_sub(self.capacity() - self.len());
-
-		self.buf.reserve_exact(additional);
-	}
-
-	/// Shrinks the capacity of the vector as much as possible.
-	pub fn shrink_to_fit(&mut self) {
-		self.buf.shrink_to_fit();
-	}
-
-	/// Shrinks the capacity of the vector with a lower bound.
-	pub fn shrink_to(&mut self, min_capacity: usize) {
-		self.buf.shrink_to(min_capacity);
+	pub const fn capacity(&self) -> usize {
+		self.elements.len()
 	}
 
 	/// Returns the number of elements in the [`Arena`].
 	#[inline]
 	#[must_use]
-	pub const fn len(&self) -> usize {
-		self.len
+	pub fn len(&self) -> usize {
+		self.len.try_into_unchecked()
 	}
 
 	/// Returns `true` if the [`Arena`] contains no elements.
 	#[inline]
 	#[must_use]
-	pub const fn is_empty(&self) -> bool {
-		self.len() == 0
+	pub fn is_empty(&self) -> bool {
+		self.len.try_into_unchecked() == Key::Index::MIN.try_into_unchecked()
 	}
 
-	/// Returns a reference to the value corresponding to the key.
+	/// Returns a reference to the value corresponding to the given key.
 	#[inline]
 	#[must_use]
-	pub fn get(&self, key: K) -> Option<&T> {
-		let entry = self.buf.get(key.index());
-
-		entry
-			.filter(|element| has_version(key, element))
-			.and_then(|element| element.value.as_ref())
+	pub fn get(&self, key: Key) -> Option<&Value> {
+		self.elements
+			.get(key.index().try_into_unchecked())
+			.and_then(|element| element.get(key.version()))
 	}
 
-	/// Returns a mutable reference to the value corresponding to the key.
+	/// Returns a mutable reference to the value corresponding to the given key.
 	#[inline]
 	#[must_use]
-	pub fn get_mut(&mut self, key: K) -> Option<&mut T> {
-		let entry = self.buf.get_mut(key.index());
-
-		entry
-			.filter(|element| has_version(key, element))
-			.and_then(|element| element.value.as_mut())
+	pub fn get_mut(&mut self, key: Key) -> Option<&mut Value> {
+		self.elements
+			.get_mut(key.index().try_into_unchecked())
+			.and_then(|element| element.get_mut(key.version()))
 	}
 
-	/// Returns the key to the last occupied slot of the [`Arena`].
-	#[inline]
-	#[must_use]
-	pub fn last_key(&self) -> Option<K> {
-		self.keys().next_back()
+	/// Reserves capacity for `additional` more elements to be inserted. Less elements
+	/// may be inserted if a `Key::Index` cannot represent the new capacity.
+	pub fn reserve_exact(&mut self, additional: usize) {
+		let capacity = Key::Index::MAX
+			.try_into_unchecked()
+			.min(additional + self.len());
+
+		if capacity <= self.capacity() {
+			return;
+		}
+
+		let mut elements = core::mem::take(&mut self.elements).into_vec();
+
+		elements.reserve_exact(capacity - elements.len());
+
+		for index in elements.len()..elements.capacity() {
+			if let Some(next) = Key::Index::try_from_checked(index + 1) {
+				elements.push(Element::Vacant {
+					version: Key::Version::MIN,
+					next,
+				});
+			} else {
+				break;
+			}
+		}
+
+		self.elements = elements.into();
 	}
 
-	/// Returns `true` if the [`Arena`] contains the key.
-	#[inline]
-	#[must_use]
-	pub fn contains_key(&self, key: K) -> bool {
-		self.get(key).is_some()
-	}
+	/// Reserves capacity for `additional` more elements to be inserted. Less elements
+	/// may be inserted if a `Key::Index` cannot represent the new capacity.
+	pub fn reserve(&mut self, additional: usize) {
+		let capacity = Key::Index::MAX
+			.try_into_unchecked()
+			.min(additional + self.len());
 
-	#[inline]
-	fn key_at_next(&self) -> Option<K> {
-		let entry = self.buf.get(self.next);
-		let version = entry.map_or_else(K::Version::new, |entry| entry.version);
+		if capacity <= self.capacity() {
+			return;
+		}
 
-		K::new(self.next, version)
+		let mut elements = core::mem::take(&mut self.elements).into_vec();
+
+		elements.reserve(capacity - elements.len());
+
+		for index in elements.len()..elements.capacity() {
+			if let Some(next) = Key::Index::try_from_checked(index + 1) {
+				elements.push(Element::Vacant {
+					version: Key::Version::MIN,
+					next,
+				});
+			} else {
+				break;
+			}
+		}
+
+		self.elements = elements.into();
 	}
 
 	/// Attempts to insert a value into the [`Arena`], returning the key if successful.
 	#[inline]
 	#[must_use]
-	pub fn try_insert(&mut self, value: T) -> Option<K> {
-		let key = self.key_at_next()?;
+	pub fn try_insert(&mut self, value: Value) -> Option<Key> {
+		self.reserve(1);
 
-		if self.next == self.buf.len() {
-			let next = self.next.checked_add(1)?;
-
-			self.buf.push(Entry::vacant(next));
+		if self.len() == self.capacity() {
+			return None;
 		}
 
-		self.len += 1;
-		self.next = self.buf[self.next].set(value);
+		let len = try_transform(self.len, |len| len.checked_add(1))?;
+		let (version, next) = self.elements[self.next.try_into_unchecked()].set(value);
+
+		let key = Key::new(self.next, version);
+
+		self.len = len;
+		self.next = next;
 
 		Some(key)
 	}
 
 	/// Inserts a value into the [`Arena`], returning the key.
+	///
+	/// # Panics
+	///
+	/// Panics if the [`Arena`] is at capacity.
 	#[inline]
 	#[must_use]
-	pub fn insert(&mut self, value: T) -> K {
-		self.try_insert(value).expect("arena is full")
+	pub fn insert(&mut self, value: Value) -> Key {
+		self.try_insert(value).expect("should be able to insert")
 	}
 
-	/// Attempts to remove a value from the [`Arena`], returning the value if successful.
+	/// Attempts to remove a key from the [`Arena`], returning the value if successful.
 	#[inline]
-	pub fn try_remove(&mut self, key: K) -> Option<T> {
-		let index = key.index();
+	#[must_use]
+	pub fn try_remove(&mut self, key: Key) -> Option<Value> {
+		let len = try_transform(self.len, |len| len.checked_sub(1))?;
+		let value = self
+			.elements
+			.get_mut(key.index().try_into_unchecked())
+			.and_then(|element| element.reset(self.next))?;
 
-		let old = self
-			.buf
-			.get_mut(index)
-			.filter(|entry| has_version(key, entry))
-			.and_then(|entry| entry.unset(self.next))?;
+		self.len = len;
+		self.next = key.index();
 
-		self.len -= 1;
-		self.next = index;
-
-		Some(old)
+		Some(value)
 	}
 
-	/// Removes a value from the [`Arena`], returning the value.
+	/// Removes a key from the [`Arena`], returning the value.
+	///
+	/// # Panics
+	///
+	/// Panics if the key is not present in the [`Arena`].
 	#[inline]
-	pub fn remove(&mut self, key: K) -> T {
-		self.try_remove(key).expect("invalid key")
+	pub fn remove(&mut self, key: Key) -> Value {
+		self.try_remove(key).expect("should be able to remove")
+	}
+
+	/// Clears the [`Arena`], removing all values.
+	#[inline]
+	pub fn clear(&mut self) {
+		self.retain(|_, _| false);
 	}
 
 	/// Retains only the elements specified by the predicate.
-	pub fn retain(&mut self, mut f: impl FnMut(K, &T) -> bool) {
-		let mut remaining = self.len();
-
-		for (i, entry) in self.buf.iter_mut().enumerate() {
-			if remaining == 0 {
-				break;
-			}
-
-			if let Some(value) = entry.value.as_ref() {
-				let key = K::new(i, entry.version).unwrap_or_else(|| unreachable!());
-
-				if !f(key, value) {
-					entry.unset(self.next);
-					self.next = i;
-					self.len -= 1;
-					remaining -= 1;
-				}
-			}
-		}
-	}
-
-	/// Retains only the elements specified by the predicate, passing a mutable reference to it.
-	pub fn retain_mut(&mut self, mut f: impl FnMut(K, &mut T) -> bool) {
-		let mut remaining = self.len();
-
-		for (i, entry) in self.buf.iter_mut().enumerate() {
-			if remaining == 0 {
-				break;
-			}
-
-			if let Some(value) = entry.value.as_mut() {
-				let key = K::new(i, entry.version).unwrap_or_else(|| unreachable!());
-
-				if !f(key, value) {
-					entry.unset(self.next);
-					self.next = i;
-					self.len -= 1;
-					remaining -= 1;
-				}
-			}
-		}
-	}
-}
-
-impl<K: Key, T> Default for Arena<K, T> {
 	#[inline]
-	fn default() -> Self {
-		Self::new()
-	}
-}
+	pub fn retain(&mut self, mut f: impl FnMut(Key, &Value) -> bool) {
+		for (index, element) in self.elements.iter_mut().enumerate() {
+			if self.len.try_into_unchecked() == Key::Index::MIN.try_into_unchecked() {
+				break;
+			}
 
-impl<K: Key, T: Clone> Clone for Arena<K, T> {
-	fn clone(&self) -> Self {
-		Self {
-			buf: self.buf.clone(),
-			len: self.len,
-			next: self.next,
+			if let Element::Occupied { version, value } = element {
+				let index = Key::Index::try_from_checked(index).unwrap_or_else(|| unreachable!());
+				let key = Key::new(index, *version);
+
+				if !f(key, value) {
+					let len = try_transform(self.len, |len| len.checked_sub(1))
+						.unwrap_or_else(|| unreachable!());
+
+					element.reset(self.next).unwrap_or_else(|| unreachable!());
+
+					self.next = index;
+					self.len = len;
+				}
+			}
 		}
 	}
 }
 
-impl<K: Key + Debug, T: Debug> Debug for Arena<K, T> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+impl<Key: Referent, Value> Index<Key> for Arena<Key, Value> {
+	type Output = Value;
+
+	#[inline]
+	fn index(&self, key: Key) -> &Self::Output {
+		self.get(key).expect("should be able to get")
+	}
+}
+
+impl<Key: Referent, Value> IndexMut<Key> for Arena<Key, Value> {
+	#[inline]
+	fn index_mut(&mut self, key: Key) -> &mut Self::Output {
+		self.get_mut(key).expect("should be able to get_mut")
+	}
+}
+
+impl<Key: Referent + Debug, Value: Debug> Debug for Arena<Key, Value> {
+	fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
 		f.debug_map().entries(self.iter()).finish()
-	}
-}
-
-impl<K: Key, T> Index<K> for Arena<K, T> {
-	type Output = T;
-
-	#[inline]
-	fn index(&self, key: K) -> &Self::Output {
-		self.get(key).expect("invalid key")
-	}
-}
-
-impl<K: Key, T> IndexMut<K> for Arena<K, T> {
-	#[inline]
-	fn index_mut(&mut self, key: K) -> &mut Self::Output {
-		self.get_mut(key).expect("invalid key")
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use crate::{key::Id, version::Nil};
-
-	use super::Arena;
+	use crate::{
+		collection::Arena,
+		referent::{Id, Nil},
+	};
 
 	#[test]
 	fn add_and_remove() {
@@ -389,11 +304,34 @@ mod test {
 
 	#[test]
 	fn remove_twice_nil() {
-		let mut arena = Arena::<Id<Nil>, usize>::new();
+		let mut arena = Arena::<Id<u32, Nil>, usize>::new();
 
 		let a = arena.insert(10);
 
 		assert_eq!(arena.try_remove(a), Some(10));
 		assert_eq!(arena.try_remove(a), None);
+	}
+
+	#[test]
+	fn add_and_clear() {
+		let mut arena = Arena::<Id, u32>::new();
+
+		let a = arena.insert(10);
+		let b = arena.insert(20);
+		let c = arena.insert(30);
+
+		assert_eq!(arena[a], 10);
+		assert_eq!(arena[b], 20);
+		assert_eq!(arena[c], 30);
+
+		assert_eq!(arena.len(), 3);
+
+		arena.clear();
+
+		assert_eq!(arena.len(), 0);
+
+		assert_eq!(arena.get(a), None);
+		assert_eq!(arena.get(b), None);
+		assert_eq!(arena.get(c), None);
 	}
 }

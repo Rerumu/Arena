@@ -5,7 +5,7 @@ The `Arena` is a data structure traditionally used for the bulk allocation of ho
 ## Example
 
 ```rust
-use arena::{collection::Arena, key::Id};
+use arena::{collection::Arena, referent::Id};
 
 let mut arena = Arena::<Id, &str>::new();
 
@@ -20,7 +20,6 @@ assert_eq!(arena[world], "World");
 
 - `O(1)` insertion and removal
 - `O(1)` access to elements by key
-- No `unsafe` code
-- Custom index types
-- Optional generational indices
 - `no_std` support
+- No `unsafe` code
+- Optional generational indices

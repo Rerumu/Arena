@@ -1,46 +1,51 @@
-//! Contains the arena iterator types.
+use core::{
+	iter::{Enumerate, FusedIterator},
+	slice::{Iter as InnerIter, IterMut as InnerIterMut},
+};
 
-use core::iter::{Enumerate, FusedIterator};
+use alloc::vec::IntoIter as InnerIntoIter;
 
 use crate::{
-	collection::{Arena, Entry},
-	key::Key,
+	collection::Arena,
+	element::Element,
+	referent::{Referent, Similar},
 };
 
 macro_rules! impl_iterator {
 	(
 		$(#[$attr:meta])*
-		$name:ident$(<$lt:lifetime>)?, $iter:ident, $entry:ty, $value:ty, $extract:ident
+		$name:ident$(<$lt:lifetime>)?, $iter:ident, $element:ty, $value:ty, $get:ident
 	) => {
 		$(#[$attr])*
-		pub struct $name<$($lt,)? K: Key, T> {
-			pub(crate) buf: Enumerate<$iter<$($lt,)? Entry<K::Version, T>>>,
+		pub struct $name<$($lt,)? Key: Referent, Value> {
+			pub(crate) iterator: Enumerate<$iter<$($lt,)? Element<Key::Version, Key::Index, Value>>>,
 			pub(crate) len: usize,
 		}
 
-		impl<$($lt,)? K: Key, T> $name<$($lt,)? K, T> {
+		impl<$($lt,)? Key: Referent, Value> $name<$($lt,)? Key, Value> {
 			#[inline]
-			fn ref_next<I>(mut iter: I) -> Option<(K, $value)>
+			fn ref_next<I>(mut iter: I) -> Option<(Key, $value)>
 			where
-				I: Iterator<Item = (usize, $entry)>,
+				I: Iterator<Item = (usize, $element)>,
 			{
 				iter.find_map(|element| {
-					let id = K::new(element.0, element.1.version)?;
-					let value = element.1.value.$extract()?;
+					let index = Key::Index::try_from_checked(element.0)?;
+					let key = Key::new(index, element.1.version());
+					let value = element.1.$get()?;
 
-					Some((id, value))
+					Some((key, value))
 				})
 			}
 		}
 
-		impl<$($lt,)? K: Key, T> Iterator for $name<$($lt,)? K, T> {
-			type Item = (K, $value);
+		impl<$($lt,)? Key: Referent, Value> Iterator for $name<$($lt,)? Key, Value> {
+			type Item = (Key, $value);
 
 			#[inline]
 			fn next(&mut self) -> Option<Self::Item> {
 				self.len = self.len.checked_sub(1)?;
 
-				Self::ref_next(self.buf.by_ref())
+				Self::ref_next(self.iterator.by_ref())
 			}
 
 			#[inline]
@@ -54,62 +59,59 @@ macro_rules! impl_iterator {
 			}
 		}
 
-		impl<$($lt,)? K: Key, T> DoubleEndedIterator for $name<$($lt,)? K, T> {
+		impl<$($lt,)? Key: Referent, Value> DoubleEndedIterator for $name<$($lt,)? Key, Value> {
 			#[inline]
 			fn next_back(&mut self) -> Option<Self::Item> {
 				self.len = self.len.checked_sub(1)?;
 
-				Self::ref_next(self.buf.by_ref().rev())
+				Self::ref_next(self.iterator.by_ref().rev())
 			}
 		}
 
-		impl<$($lt,)? K: Key, T> ExactSizeIterator for $name<$($lt,)? K, T> {}
+		impl<$($lt,)? Key: Referent, Value> ExactSizeIterator for $name<$($lt,)? Key, Value> {}
 
-		impl<$($lt,)? K: Key, T> FusedIterator for $name<$($lt,)? K, T> {}
+		impl<$($lt,)? Key: Referent, Value> FusedIterator for $name<$($lt,)? Key, Value> {}
 	};
 }
-
-use alloc::vec::IntoIter as InnerIntoIter;
-use core::slice::{Iter as InnerIter, IterMut as InnerIterMut};
 
 // `#[must_use]` is only present on borrowed iterators to mirror arrays, `Vec`, `BTreeMap`, etc.
 impl_iterator!(
 	/// A consuming iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::into_iter`] method.
-	IntoIter, InnerIntoIter, Entry<K::Version, T>, T, into_inner
+	IntoIter, InnerIntoIter, Element<Key::Version, Key::Index, Value>, Value, into_inner
 );
 impl_iterator!(
 	/// An iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::iter`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Iter<'a>, InnerIter, &'a Entry<K::Version, T>, &'a T, as_ref
+	Iter<'a>, InnerIter, &'a Element<Key::Version, Key::Index, Value>, &'a Value, as_ref
 );
 impl_iterator!(
 	/// A mutable iterator over the keys and values of the [`Arena`].
 	///
 	/// Created by the [`Arena::iter_mut`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IterMut<'a>, InnerIterMut, &'a mut Entry<K::Version, T>, &'a mut T, as_mut
+	IterMut<'a>, InnerIterMut, &'a mut Element<Key::Version, Key::Index, Value>, &'a mut Value, as_mut
 );
 
 macro_rules! impl_wrapper {
 	(
 		$(#[$attr:meta])*
-		$name:ident$(<$lt:lifetime>)?, $iter:ty, $item:ty, $extract:expr
+		$name:ident$(<$lt:lifetime>)?, $iter:ty, $item:ty, $get:expr
 	) => {
 		$(#[$attr])*
-		pub struct $name<$($lt,)? K: Key, T> {
+		pub struct $name<$($lt,)? Key: Referent, Value> {
 			iter: $iter,
 		}
 
-		impl<$($lt,)? K: Key, T> Iterator for $name<$($lt,)? K, T> {
+		impl<$($lt,)? Key: Referent, Value> Iterator for $name<$($lt,)? Key, Value> {
 			type Item = $item;
 
 			#[inline]
 			fn next(&mut self) -> Option<Self::Item> {
-				self.iter.next().map($extract)
+				self.iter.next().map($get)
 			}
 
 			#[inline]
@@ -123,16 +125,16 @@ macro_rules! impl_wrapper {
 			}
 		}
 
-		impl<$($lt,)? K: Key, T> DoubleEndedIterator for $name<$($lt,)? K, T> {
+		impl<$($lt,)? Key: Referent, Value> DoubleEndedIterator for $name<$($lt,)? Key, Value> {
 			#[inline]
 			fn next_back(&mut self) -> Option<Self::Item> {
-				self.iter.next_back().map($extract)
+				self.iter.next_back().map($get)
 			}
 		}
 
-		impl<$($lt,)? K: Key, T> ExactSizeIterator for $name<$($lt,)? K, T> {}
+		impl<$($lt,)? Key: Referent, Value> ExactSizeIterator for $name<$($lt,)? Key, Value> {}
 
-		impl<$($lt,)? K: Key, T> FusedIterator for $name<$($lt,)? K, T> {}
+		impl<$($lt,)? Key: Referent, Value> FusedIterator for $name<$($lt,)? Key, Value> {}
 	};
 }
 
@@ -142,59 +144,59 @@ impl_wrapper!(
 	///
 	/// Created by the [`Arena::into_keys`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IntoKeys, IntoIter<K, T>, K, |entry| entry.0
+	IntoKeys, IntoIter<Key, Value>, Key, |entry| entry.0
 );
 impl_wrapper!(
 	/// An iterator over the keys of the [`Arena`].
 	///
 	/// Created by the [`Arena::keys`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Keys<'a>, Iter<'a, K, T>, K, |entry| entry.0
+	Keys<'a>, Iter<'a, Key, Value>, Key, |entry| entry.0
 );
 impl_wrapper!(
 	/// A consuming iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::into_values`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	IntoValues, IntoIter<K, T>, T, |entry| entry.1
+	IntoValues, IntoIter<Key, Value>, Value, |entry| entry.1
 );
 impl_wrapper!(
 	/// An iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::values`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	Values<'a>, Iter<'a, K, T>, &'a T, |entry| entry.1
+	Values<'a>, Iter<'a, Key, Value>, &'a Value, |entry| entry.1
 );
 impl_wrapper!(
 	/// A mutable iterator over the values of the [`Arena`].
 	///
 	/// Created by the [`Arena::values_mut`] method.
 	#[must_use = "iterators are lazy and do nothing unless consumed"]
-	ValuesMut<'a>, IterMut<'a, K, T>, &'a mut T, |entry| entry.1
+	ValuesMut<'a>, IterMut<'a, Key, Value>, &'a mut Value, |entry| entry.1
 );
 
-impl<K: Key, T> Arena<K, T> {
+impl<Key: Referent, Value> Arena<Key, Value> {
 	/// Returns an iterator over the keys and values of the [`Arena`].
 	#[inline]
-	pub fn iter(&self) -> Iter<'_, K, T> {
+	pub fn iter(&self) -> Iter<'_, Key, Value> {
 		let len = self.len();
-		let buf = self.buf.iter().enumerate();
+		let iterator = self.elements.iter().enumerate();
 
-		Iter { buf, len }
+		Iter { iterator, len }
 	}
 
 	/// Returns a mutable iterator over the keys and values of the [`Arena`].
 	#[inline]
-	pub fn iter_mut(&mut self) -> IterMut<'_, K, T> {
+	pub fn iter_mut(&mut self) -> IterMut<'_, Key, Value> {
 		let len = self.len();
-		let buf = self.buf.iter_mut().enumerate();
+		let iterator = self.elements.iter_mut().enumerate();
 
-		IterMut { buf, len }
+		IterMut { iterator, len }
 	}
 
 	/// Returns a consuming iterator over the keys of the [`Arena`].
 	#[inline]
-	pub fn into_keys(self) -> IntoKeys<K, T> {
+	pub fn into_keys(self) -> IntoKeys<Key, Value> {
 		IntoKeys {
 			iter: self.into_iter(),
 		}
@@ -202,13 +204,13 @@ impl<K: Key, T> Arena<K, T> {
 
 	/// Returns an iterator over the keys of the [`Arena`].
 	#[inline]
-	pub fn keys(&self) -> Keys<'_, K, T> {
+	pub fn keys(&self) -> Keys<'_, Key, Value> {
 		Keys { iter: self.iter() }
 	}
 
 	/// Returns a consuming iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn into_values(self) -> IntoValues<K, T> {
+	pub fn into_values(self) -> IntoValues<Key, Value> {
 		IntoValues {
 			iter: self.into_iter(),
 		}
@@ -216,36 +218,36 @@ impl<K: Key, T> Arena<K, T> {
 
 	/// Returns an iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn values(&self) -> Values<'_, K, T> {
+	pub fn values(&self) -> Values<'_, Key, Value> {
 		Values { iter: self.iter() }
 	}
 
 	/// Returns a mutable iterator over the values of the [`Arena`].
 	#[inline]
-	pub fn values_mut(&mut self) -> ValuesMut<'_, K, T> {
+	pub fn values_mut(&mut self) -> ValuesMut<'_, Key, Value> {
 		ValuesMut {
 			iter: self.iter_mut(),
 		}
 	}
 }
 
-impl<K: Key, T> IntoIterator for Arena<K, T> {
-	type Item = (K, T);
-	type IntoIter = IntoIter<K, T>;
+impl<Key: Referent, Value> IntoIterator for Arena<Key, Value> {
+	type Item = (Key, Value);
+	type IntoIter = IntoIter<Key, Value>;
 
 	/// Returns a consuming iterator over the keys and values of the [`Arena`].
 	#[inline]
 	fn into_iter(self) -> Self::IntoIter {
 		let len = self.len();
-		let buf = self.buf.into_iter().enumerate();
+		let iterator = self.elements.into_vec().into_iter().enumerate();
 
-		IntoIter { buf, len }
+		IntoIter { iterator, len }
 	}
 }
 
-impl<'a, K: Key, T> IntoIterator for &'a Arena<K, T> {
-	type Item = (K, &'a T);
-	type IntoIter = Iter<'a, K, T>;
+impl<'a, Key: Referent, Value> IntoIterator for &'a Arena<Key, Value> {
+	type Item = (Key, &'a Value);
+	type IntoIter = Iter<'a, Key, Value>;
 
 	/// See [`iter`](`Arena::iter`).
 	#[inline]
@@ -254,9 +256,9 @@ impl<'a, K: Key, T> IntoIterator for &'a Arena<K, T> {
 	}
 }
 
-impl<'a, K: Key, T> IntoIterator for &'a mut Arena<K, T> {
-	type Item = (K, &'a mut T);
-	type IntoIter = IterMut<'a, K, T>;
+impl<'a, Key: Referent, Value> IntoIterator for &'a mut Arena<Key, Value> {
+	type Item = (Key, &'a mut Value);
+	type IntoIter = IterMut<'a, Key, Value>;
 
 	/// See [`iter_mut`](`Arena::iter_mut`).
 	#[inline]
@@ -265,25 +267,25 @@ impl<'a, K: Key, T> IntoIterator for &'a mut Arena<K, T> {
 	}
 }
 
-impl<K: Key, T: Clone> Clone for IntoIter<K, T> {
+impl<Key: Referent, Value: Clone> Clone for IntoIter<Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
-			buf: self.buf.clone(),
+			iterator: self.iterator.clone(),
 			len: self.len,
 		}
 	}
 }
 
-impl<'a, K: Key, T> Clone for Iter<'a, K, T> {
+impl<'a, Key: Referent, Value> Clone for Iter<'a, Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
-			buf: self.buf.clone(),
+			iterator: self.iterator.clone(),
 			len: self.len,
 		}
 	}
 }
 
-impl<K: Key, T: Clone> Clone for IntoKeys<K, T> {
+impl<Key: Referent, Value: Clone> Clone for IntoKeys<Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -291,7 +293,7 @@ impl<K: Key, T: Clone> Clone for IntoKeys<K, T> {
 	}
 }
 
-impl<'a, K: Key, T> Clone for Keys<'a, K, T> {
+impl<'a, Key: Referent, Value> Clone for Keys<'a, Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -299,7 +301,7 @@ impl<'a, K: Key, T> Clone for Keys<'a, K, T> {
 	}
 }
 
-impl<K: Key, T: Clone> Clone for IntoValues<K, T> {
+impl<Key: Referent, Value: Clone> Clone for IntoValues<Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -307,7 +309,7 @@ impl<K: Key, T: Clone> Clone for IntoValues<K, T> {
 	}
 }
 
-impl<'a, K: Key, T> Clone for Values<'a, K, T> {
+impl<'a, Key: Referent, Value> Clone for Values<'a, Key, Value> {
 	fn clone(&self) -> Self {
 		Self {
 			iter: self.iter.clone(),
@@ -319,7 +321,7 @@ impl<'a, K: Key, T> Clone for Values<'a, K, T> {
 mod tests {
 	use crate::{
 		collection::Arena,
-		key::{Id, Key},
+		referent::{Id, Referent, Similar},
 	};
 
 	#[test]
@@ -335,7 +337,7 @@ mod tests {
 		let mut count = 0;
 
 		for (id, value) in &arena {
-			assert_eq!(*value, COUNT - id.index());
+			assert_eq!(*value, COUNT - id.index().try_into_unchecked());
 
 			count += 1;
 		}
@@ -346,23 +348,28 @@ mod tests {
 	#[test]
 	fn iterate_keys_and_values() {
 		let mut arena = Arena::<Id, usize>::new();
+
 		let a = arena.insert(0);
 		let b = arena.insert(1);
 		let c = arena.insert(2);
 
 		let mut iter = arena.iter();
+
 		assert_eq!(iter.next(), Some((a, &0)));
 		assert_eq!(iter.next(), Some((b, &1)));
 		assert_eq!(iter.next(), Some((c, &2)));
 		assert_eq!(iter.next(), None);
 
 		let mut iter = arena.iter_mut();
+
 		*iter.next().unwrap().1 = 3;
 		*iter.next().unwrap().1 = 4;
 		*iter.next().unwrap().1 = 5;
+
 		assert_eq!(iter.next(), None);
 
 		let mut iter = arena.into_iter();
+
 		assert_eq!(iter.next(), Some((a, 3)));
 		assert_eq!(iter.next(), Some((b, 4)));
 		assert_eq!(iter.next(), Some((c, 5)));
@@ -372,17 +379,20 @@ mod tests {
 	#[test]
 	fn iterate_keys() {
 		let mut arena = Arena::<Id, usize>::new();
+
 		let a = arena.insert(0);
 		let b = arena.insert(1);
 		let c = arena.insert(2);
 
 		let mut iter = arena.keys();
+
 		assert_eq!(iter.next(), Some(a));
 		assert_eq!(iter.next(), Some(b));
 		assert_eq!(iter.next(), Some(c));
 		assert_eq!(iter.next(), None);
 
 		let mut iter = arena.into_keys();
+
 		assert_eq!(iter.next(), Some(a));
 		assert_eq!(iter.next(), Some(b));
 		assert_eq!(iter.next(), Some(c));
@@ -397,18 +407,22 @@ mod tests {
 		let _ = arena.insert(2);
 
 		let mut iter = arena.values();
+
 		assert_eq!(iter.next(), Some(&0));
 		assert_eq!(iter.next(), Some(&1));
 		assert_eq!(iter.next(), Some(&2));
 		assert_eq!(iter.next(), None);
 
 		let mut iter = arena.values_mut();
+
 		*iter.next().unwrap() = 3;
 		*iter.next().unwrap() = 4;
 		*iter.next().unwrap() = 5;
+
 		assert_eq!(iter.next(), None);
 
 		let mut iter = arena.into_values();
+
 		assert_eq!(iter.next(), Some(3));
 		assert_eq!(iter.next(), Some(4));
 		assert_eq!(iter.next(), Some(5));
