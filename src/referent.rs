@@ -143,8 +143,8 @@ impl<Index: Similar<usize>, Version: Similar<NonZeroU64>> Default for Id<Index, 
 	#[inline]
 	fn default() -> Self {
 		Self {
-			index: Index::MIN,
-			version: Version::MIN,
+			index: Index::MAX,
+			version: Version::MAX,
 		}
 	}
 }
