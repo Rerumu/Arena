@@ -88,6 +88,15 @@ impl<Key: Referent, Value> Arena<Key, Value> {
 			.and_then(|element| element.get_mut(key.version()))
 	}
 
+	/// Returns the number of indices needed to store the all the elements in the [`Arena`]
+	#[inline]
+	#[must_use]
+	pub fn indices_needed(&self) -> usize {
+		self.keys()
+			.next_back()
+			.map_or(0, |id| id.index().try_into_unchecked() + 1)
+	}
+
 	/// Reserves capacity for `additional` more elements to be inserted. Less elements
 	/// may be inserted if a `Key::Index` cannot represent the new capacity.
 	pub fn reserve_exact(&mut self, additional: usize) {
