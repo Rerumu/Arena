@@ -115,6 +115,17 @@ pub struct Id<Index = defaults::Index, Version = defaults::Version> {
 	version: Version,
 }
 
+impl<Index: Similar<usize>, Version: Similar<NonZeroU64>> Id<Index, Version> {
+	#[inline]
+	#[must_use]
+	pub const fn dangling() -> Self {
+		Self {
+			index: Index::MAX,
+			version: Version::MAX,
+		}
+	}
+}
+
 impl<Index, Version> Referent for Id<Index, Version>
 where
 	Index: Similar<usize> + Copy,
@@ -142,10 +153,7 @@ where
 impl<Index: Similar<usize>, Version: Similar<NonZeroU64>> Default for Id<Index, Version> {
 	#[inline]
 	fn default() -> Self {
-		Self {
-			index: Index::MAX,
-			version: Version::MAX,
-		}
+		Self::dangling()
 	}
 }
 
